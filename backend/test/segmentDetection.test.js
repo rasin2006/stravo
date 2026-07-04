@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   extractMovingSegments,
+  extractStopPlaces,
   markStoppedPoints,
 } = require('../src/services/segmentDetection');
 
@@ -50,5 +51,20 @@ describe('segmentDetection', () => {
     const points = [point(12.565, 104.991, 0), point(12.566, 104.992, 5)];
     const segments = extractMovingSegments(points);
     assert.equal(segments.length, 1);
+  });
+
+  it('extracts stop places from 30s pauses within ~10 m', () => {
+    const points = [
+      point(12.565, 104.991, 0),
+      point(12.5651, 104.9911, 10),
+      point(12.5652, 104.9912, 20),
+      point(12.5652, 104.9912, 55),
+      point(12.570, 104.995, 70),
+      point(12.571, 104.996, 80),
+    ];
+
+    const places = extractStopPlaces(points);
+    assert.equal(places.length, 1);
+    assert.equal(places[0].length, 2);
   });
 });

@@ -1,7 +1,7 @@
 const haversine = require('../utils/haversine');
 
-/** User must stay within this radius to count as "stopped". */
-const STOP_RADIUS_METERS = 15;
+/** User must stay within this radius to count as "stopped" (~10 m area). */
+const STOP_RADIUS_METERS = 10;
 /** Minimum time stationary before a stop boundary is created. */
 const STOP_DURATION_MS = 30 * 1000;
 const MIN_SEGMENT_POINTS = 2;
@@ -72,9 +72,39 @@ function extractMovingSegments(points) {
   return segments;
 }
 
+/**
+ * Returns GPS point clusters where the user paused 30s+ within STOP_RADIUS_METERS.
+ * Each cluster becomes a "place" segment for review.
+ */
+function extractStopPlaces(points) {
+  if (points.length === 0) return [];
+
+  const stopped = markStoppedPoints(points);
+  const places = [];
+  let i = 0;
+
+  while (i < points.length) {
+    if (!stopped[i]) {
+      i += 1;
+      continue;
+    }
+
+    let j = i;
+    while (j + 1 < points.length && stopped[j + 1]) {
+      j += 1;
+    }
+
+    places.push(points.slice(i, j + 1));
+    i = j + 1;
+  }
+
+  return places;
+}
+
 module.exports = {
   STOP_RADIUS_METERS,
   STOP_DURATION_MS,
   markStoppedPoints,
   extractMovingSegments,
+  extractStopPlaces,
 };
