@@ -31,3 +31,8 @@ export async function submitSegmentFeedback(segmentId, isInteresting) {
   const { data } = await api.post(`/segments/${segmentId}/feedback`, { isInteresting });
   return data;
 }
+
+export async function uploadActivity(title, points, placeFeedback = []) {
+  const { data } = await api.post('/activities', { title, points, placeFeedback });
+  return data;
+}

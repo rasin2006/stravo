@@ -108,6 +108,9 @@ export default function ExplorePage() {
           <Link to="/" className="text-sm font-medium text-primary hover:underline">
             ← Home
           </Link>
+          <Link to="/record" className="text-sm font-medium text-primary hover:underline">
+            Record
+          </Link>
           <h1 className="font-display text-xl font-bold text-foreground">Explore Segments</h1>
         </div>
         <span className="text-sm text-muted">{filtered.length} segments</span>

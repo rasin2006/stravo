@@ -4,8 +4,8 @@ const { ValidationError } = require('../utils/errors');
 
 exports.createActivity = async (req, res, next) => {
   try {
-    const { title, points } = req.body;
-    const activity = await createActivityFromPoints(req.user.id, title, points);
+    const { title, points, placeFeedback } = req.body;
+    const activity = await createActivityFromPoints(req.user.id, title, points, placeFeedback);
     res.status(201).json(activity);
   } catch (err) {
     if (err instanceof ValidationError) {

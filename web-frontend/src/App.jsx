@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import ExplorePage from './pages/ExplorePage';
 import ActivityDetailPage from './pages/ActivityDetailPage';
+import RecordPage from './pages/RecordPage';
 import DashboardPage from './pages/DashboardPage';
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />
         <Route path="/activity/:id" element={<ActivityDetailPage />} />
+        <Route path="/record" element={<RecordPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
       </Routes>
     </BrowserRouter>

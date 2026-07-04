@@ -26,6 +26,9 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <span className="font-display text-xl font-bold text-primary">Stravo</span>
           <nav className="flex gap-4 text-sm font-medium">
+            <Link to="/record" className="text-foreground hover:text-primary">
+              Record
+            </Link>
             <Link to="/explore" className="text-foreground hover:text-primary">
               Explore
             </Link>
@@ -42,15 +45,18 @@ export default function HomePage() {
             Discover trails others have walked
           </h1>
           <p className="mt-4 text-lg text-muted">
-            Crowdsourced trail discovery for off-grid areas. Record paths on mobile, explore
-            community-rated segments on the map.
+            Crowdsourced trail discovery for off-grid areas. Record paths in your browser or
+            mobile app, then explore community-rated segments on the map.
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
+            <Link to="/record">
+              <Button>Record trail</Button>
+            </Link>
             <Link to="/explore">
-              <Button>Explore map</Button>
+              <Button variant="outline">Explore map</Button>
             </Link>
             <Link to="/dashboard">
-              <Button variant="outline">View analytics</Button>
+              <Button variant="ghost">View analytics</Button>
             </Link>
           </div>
           <p className="mt-6 text-sm text-muted">API status: {health}</p>
@@ -70,7 +76,7 @@ export default function HomePage() {
           <Card className="sm:col-span-2">
             <p className="font-display text-lg font-semibold">How it works</p>
             <ol className="mt-3 space-y-2 text-sm text-muted">
-              <li>1. Record a walk with the Stravo mobile app</li>
+              <li>1. Record a walk on the web or mobile app</li>
               <li>2. Paths split into ~100m segments automatically</li>
               <li>3. Community rates segments as interesting or not</li>
               <li>4. Explore the best trails on the map</li>

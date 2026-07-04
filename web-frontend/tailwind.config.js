@@ -29,6 +29,7 @@ export default {
           DEFAULT: '#DC2626',
           foreground: '#FFFFFF',
         },
+        recording: '#EF4444',
       },
       borderRadius: {
         lg: '12px',
