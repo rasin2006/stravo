@@ -33,6 +33,15 @@ export default function ExplorePage() {
       .catch((err) => setError(err.message));
   }, []);
 
+  useEffect(() => {
+    function handleUnauthorized() {
+      setLoggedIn(false);
+      setFeedbackMsg('Your session expired. Sign in again to rate segments.');
+    }
+    window.addEventListener('stravo:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('stravo:unauthorized', handleUnauthorized);
+  }, []);
+
   const filtered = useMemo(() => {
     return segments.filter((s) => {
       const scoreOk = minScore === 0 || (s.scorePercent != null && s.scorePercent >= minScore);
@@ -77,8 +86,10 @@ export default function ExplorePage() {
     setSubmitting(true);
     setFeedbackMsg('');
     try {
-      await submitSegmentFeedback(selected.id, isInteresting);
-      setFeedbackMsg('Thanks — your rating was saved.');
+      const result = await submitSegmentFeedback(selected.id, isInteresting);
+      setFeedbackMsg(
+        result.updated ? 'Rating updated.' : 'Thanks — your rating was saved.'
+      );
       const { data } = await api.get('/segments');
       setSegments(data);
       const updated = data.find((s) => s.id === selected.id);
@@ -110,7 +121,7 @@ export default function ExplorePage() {
                 <button
                   type="button"
                   onClick={() => switchAuthMode('login')}
-                  className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${
+                  className={`flex-1 min-h-[44px] rounded-md py-1.5 text-xs font-semibold transition-colors ${
                     authMode === 'login'
                       ? 'bg-surface text-primary shadow-sm'
                       : 'text-muted'
@@ -121,7 +132,7 @@ export default function ExplorePage() {
                 <button
                   type="button"
                   onClick={() => switchAuthMode('register')}
-                  className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${
+                  className={`flex-1 min-h-[44px] rounded-md py-1.5 text-xs font-semibold transition-colors ${
                     authMode === 'register'
                       ? 'bg-surface text-primary shadow-sm'
                       : 'text-muted'
@@ -167,7 +178,7 @@ export default function ExplorePage() {
                 <button
                   type="submit"
                   disabled={authLoading}
-                  className="w-full rounded-pill bg-primary py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                  className="w-full min-h-[44px] rounded-pill bg-primary py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {authLoading
                     ? 'Please wait…'
@@ -235,7 +246,7 @@ export default function ExplorePage() {
                       setFeedbackMsg('');
                     }}
                     onMouseEnter={() => setSelected(segment)}
-                    className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                    className={`w-full min-h-[44px] rounded-lg border p-3 text-left transition-colors ${
                       selected?.id === segment.id
                         ? 'border-primary bg-primary/5'
                         : 'border-border bg-background hover:border-primary/40'

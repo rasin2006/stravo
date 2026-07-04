@@ -5,40 +5,71 @@ import {
   StyleSheet,
   TextInput,
   Alert,
-  TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Polyline } from 'react-native-maps';
 import {
   startRecording,
   stopRecording,
+  clearRecording,
   getIsRecording,
   getRecordingDurationSeconds,
   subscribeToPoints,
   startUserLocationWatch,
   stopUserLocationWatch,
+  fetchCurrentLocation,
+  subscribeToUserLocation,
 } from '../../services/gpsService';
 import { uploadActivity } from '../../services/activityService';
-import { Button, InlineBottomSheet, StatChip, CambodiaMapView } from '../../components';
+import { Button, InlineBottomSheet, StatChip, CambodiaMapView, LocateButton } from '../../components';
 import { colors, spacing, typography } from '../../theme';
-import { formatDistance, formatDuration, pathDistanceMeters, regionFromCoords } from '../../utils/mapUtils';
+import {
+  formatDistance,
+  formatDuration,
+  pathDistanceMeters,
+  regionFromCoords,
+  regionFromUserLocation,
+} from '../../utils/mapUtils';
 
-export default function MapScreen({ navigation }) {
+export default function MapScreen({ navigation, isFocused }) {
+  const insets = useSafeAreaInsets();
   const mapRef = useRef(null);
+  const hasZoomedToUser = useRef(false);
   const [recording, setRecording] = useState(getIsRecording());
   const [points, setPoints] = useState([]);
+  const [pendingUpload, setPendingUpload] = useState(null);
   const [duration, setDuration] = useState(0);
   const [title, setTitle] = useState('Forest walk');
   const [uploading, setUploading] = useState(false);
   const [locationReady, setLocationReady] = useState(false);
+  const [userCoords, setUserCoords] = useState(null);
+
+  const displayPoints = pendingUpload || points;
 
   useEffect(() => {
-    const unsub = subscribeToPoints(setPoints);
+    const unsubPoints = subscribeToPoints(setPoints);
+    const unsubLocation = subscribeToUserLocation(setUserCoords);
+
+    fetchCurrentLocation().then((coords) => {
+      if (coords) setLocationReady(true);
+    });
     startUserLocationWatch().then(setLocationReady);
+
     return () => {
-      unsub();
+      unsubPoints();
+      unsubLocation();
       stopUserLocationWatch();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isFocused || !userCoords || hasZoomedToUser.current || displayPoints.length > 1) {
+      return;
+    }
+    mapRef.current?.animateToRegion(regionFromUserLocation(userCoords), 600);
+    hasZoomedToUser.current = true;
+  }, [isFocused, userCoords, displayPoints.length]);
 
   useEffect(() => {
     if (!recording) return undefined;
@@ -51,16 +82,24 @@ export default function MapScreen({ navigation }) {
   }, [recording]);
 
   useEffect(() => {
-    if (points.length > 1 && mapRef.current) {
-      mapRef.current.fitToCoordinates(points, {
-        edgePadding: { top: 80, right: 40, bottom: 200, left: 40 },
+    if (displayPoints.length > 1 && mapRef.current && recording) {
+      mapRef.current.fitToCoordinates(displayPoints, {
+        edgePadding: { top: 120, right: 40, bottom: 260, left: 40 },
         animated: true,
       });
     }
-  }, [points.length]);
+  }, [displayPoints.length, recording]);
+
+  function zoomToUser() {
+    if (userCoords && mapRef.current) {
+      mapRef.current.animateToRegion(regionFromUserLocation(userCoords), 400);
+    }
+  }
 
   async function handleStart() {
     try {
+      setPendingUpload(null);
+      clearRecording();
       await startRecording();
       setRecording(true);
       setDuration(0);
@@ -69,23 +108,37 @@ export default function MapScreen({ navigation }) {
     }
   }
 
-  async function handleStopAndUpload() {
+  async function handleStop() {
     const recorded = await stopRecording();
     setRecording(false);
 
     if (recorded.length < 2) {
-      Alert.alert('Not enough GPS data', 'Walk a little longer before uploading.');
+      Alert.alert('Not enough GPS data', 'Walk a little longer before saving.');
+      clearRecording();
+      setPendingUpload(null);
+      return;
+    }
+
+    setPendingUpload(recorded);
+  }
+
+  async function handleUpload() {
+    const toUpload = pendingUpload || points;
+    if (!toUpload || toUpload.length < 2) {
+      Alert.alert('Nothing to upload', 'Record a trail first.');
       return;
     }
 
     setUploading(true);
     try {
-      const activity = await uploadActivity(title, recorded);
+      const activity = await uploadActivity(title, toUpload);
       Alert.alert(
         'Path uploaded',
-        `Saved "${activity.title}" with ${activity.activitySegments?.length || 0} segments.`,
+        `Saved "${activity.title}" with ${activity.activitySegments?.length || 0} segments (split at 30s pauses).`,
         [{ text: 'View', onPress: () => navigation.navigate('PathDetail', { activityId: activity.id }) }]
       );
+      clearRecording();
+      setPendingUpload(null);
     } catch (err) {
       Alert.alert('Upload failed', err.response?.data?.message || err.message);
     } finally {
@@ -93,8 +146,28 @@ export default function MapScreen({ navigation }) {
     }
   }
 
-  const distance = pathDistanceMeters(points);
-  const initialRegion = regionFromCoords(points);
+  function handleDiscard() {
+    Alert.alert('Discard recording?', 'Your recorded points will be lost.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Discard',
+        style: 'destructive',
+        onPress: () => {
+          clearRecording();
+          setPendingUpload(null);
+        },
+      },
+    ]);
+  }
+
+  const distance = pathDistanceMeters(displayPoints);
+  const initialRegion = userCoords
+    ? regionFromUserLocation(userCoords)
+    : regionFromCoords(displayPoints);
+
+  const showStartButton = !recording && !pendingUpload;
+  const showRecordingControls = recording;
+  const showUploadControls = !recording && pendingUpload;
 
   return (
     <View style={styles.container}>
@@ -106,17 +179,34 @@ export default function MapScreen({ navigation }) {
         followsUserLocation={recording}
         mapType="terrain"
       >
-        {points.length > 1 && (
-          <Polyline coordinates={points} strokeColor={colors.route} strokeWidth={4} />
+        {displayPoints.length > 1 && (
+          <Polyline coordinates={displayPoints} strokeColor={colors.route} strokeWidth={4} />
         )}
       </CambodiaMapView>
 
-      <View style={styles.topBar}>
-        <Text style={styles.brand}>Stravo</Text>
-        <StatChip
-          value={recording ? '● REC' : locationReady ? '● GPS' : 'GPS…'}
-          highlight={recording}
-        />
+      <View style={[styles.topBar, { top: insets.top + spacing.sm }]}>
+        <View>
+          <Text style={styles.brand}>Record trail</Text>
+          <Text style={styles.subtitle}>
+            {recording
+              ? 'Walking… pauses of 30s create segment breaks'
+              : 'Record a new path for others to explore'}
+          </Text>
+        </View>
+        <View style={styles.topActions}>
+          {locationReady && <LocateButton onPress={zoomToUser} />}
+          <StatChip
+            leading={
+              recording ? (
+                <Ionicons name="radio-button-on" size={14} color={colors.recording} />
+              ) : locationReady ? (
+                <Ionicons name="navigate" size={14} color={colors.primary} />
+              ) : null
+            }
+            value={recording ? 'REC' : locationReady ? 'GPS' : 'GPS…'}
+            highlight={recording}
+          />
+        </View>
       </View>
 
       <View style={styles.bottomArea}>
@@ -125,28 +215,68 @@ export default function MapScreen({ navigation }) {
             style={styles.titleInput}
             value={title}
             onChangeText={setTitle}
-            placeholder="Activity title"
+            placeholder="Trail name (e.g. Forest walk)"
             placeholderTextColor={colors.muted}
+            editable={!recording}
           />
           <View style={styles.statsRow}>
             <StatChip value={formatDistance(distance)} />
             <StatChip value={formatDuration(duration)} />
-            {recording && <StatChip value="● REC" highlight />}
+            {recording && (
+              <StatChip
+                leading={<Ionicons name="radio-button-on" size={14} color={colors.recording} />}
+                value="REC"
+                highlight
+              />
+            )}
+            {pendingUpload && <StatChip value="Ready" highlight />}
           </View>
 
-          {!recording ? (
-            <TouchableOpacity style={styles.fab} onPress={handleStart} activeOpacity={0.85}>
-              <View style={styles.fabInner} />
-              <Text style={styles.fabLabel}>RECORD</Text>
-            </TouchableOpacity>
-          ) : (
-            <Button
-              title={uploading ? 'Uploading...' : 'Stop & Upload'}
-              onPress={handleStopAndUpload}
-              disabled={uploading}
-              loading={uploading}
-              style={styles.stopButton}
-            />
+          {showStartButton && (
+            <>
+              <Text style={styles.hint}>
+                Tap below when you start walking. Stop to review, then upload.
+              </Text>
+              <Button
+                title="Start recording trail"
+                onPress={handleStart}
+                style={styles.primaryAction}
+              />
+            </>
+          )}
+
+          {showRecordingControls && (
+            <>
+              <Text style={styles.hint}>Tap stop when you finish walking.</Text>
+              <Button
+                title="Stop recording"
+                variant="outline"
+                onPress={handleStop}
+                style={styles.primaryAction}
+              />
+            </>
+          )}
+
+          {showUploadControls && (
+            <>
+              <Text style={styles.hint}>
+                Review your route on the map, then upload or discard.
+              </Text>
+              <Button
+                title={uploading ? 'Uploading…' : 'Upload trail'}
+                onPress={handleUpload}
+                disabled={uploading}
+                loading={uploading}
+                style={styles.primaryAction}
+              />
+              <Button
+                title="Discard"
+                variant="outline"
+                onPress={handleDiscard}
+                disabled={uploading}
+                style={styles.secondaryAction}
+              />
+            </>
           )}
         </InlineBottomSheet>
       </View>
@@ -159,21 +289,36 @@ const styles = StyleSheet.create({
   map: { ...StyleSheet.absoluteFillObject },
   topBar: {
     position: 'absolute',
-    top: 48,
     left: spacing.xl,
     right: spacing.xl,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: spacing.md,
   },
   brand: {
     ...typography.h2,
     color: colors.foreground,
     backgroundColor: 'rgba(255,255,255,0.92)',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 999,
-    overflow: 'hidden',
+    paddingTop: spacing.sm,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: colors.muted,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    maxWidth: 240,
+  },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   bottomArea: {
     position: 'absolute',
@@ -191,35 +336,19 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     flexWrap: 'wrap',
   },
-  fab: {
-    alignSelf: 'center',
-    alignItems: 'center',
+  hint: {
+    ...typography.caption,
+    marginBottom: spacing.md,
+    color: colors.muted,
+  },
+  primaryAction: {
+    alignSelf: 'stretch',
     marginBottom: spacing.sm,
   },
-  fabInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.accent,
-    borderWidth: 4,
-    borderColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabLabel: {
-    marginTop: spacing.sm,
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.foreground,
-    letterSpacing: 1,
-  },
-  stopButton: {
+  secondaryAction: {
     alignSelf: 'stretch',
   },
 });

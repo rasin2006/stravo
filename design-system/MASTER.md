@@ -59,7 +59,29 @@ Map-first outdoor trail discovery. Earth tones + trust greens.
 
 ## Anti-patterns
 
-- No emoji as icons
+- No emoji or unicode symbols as icons (use Ionicons on mobile, SVG on web)
 - No low-contrast gray-on-gray body text
 - No form-heavy scroll on map screens
 - No default RN Button styling in production UI
+- No hardcoded safe-area offsets (`top: 48`) — use `useSafeAreaInsets()`
+
+## Icons
+
+- **Mobile**: `@expo/vector-icons` (Ionicons) via shared components (`TabBarIcon`, `LocateButton`)
+- **Web**: Inline SVG or Lucide/Heroicons when added
+- **Touch targets**: minimum 44×44pt (mobile), 48×48dp preferred on Android
+
+## Page overrides
+
+See `design-system/pages/` for screen-specific rules (e.g. `map-screens.md`).
+
+## UX audit (2026-07-04)
+
+| Check | Status |
+|-------|--------|
+| Vector icons (no emoji tabs) | Fixed |
+| 44pt touch targets | Fixed |
+| Safe area insets on map overlays | Fixed |
+| Modal scrim 50% | Fixed |
+| Accessibility labels on controls | Fixed |
+| Token-driven colors (no ad-hoc hex in chips) | Fixed |
