@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Polyline } from 'react-native-maps';
 import { listSegments, submitSegmentFeedback } from '../../services/activityService';
 import { startUserLocationWatch, stopUserLocationWatch, subscribeToUserLocation } from '../../services/gpsService';
@@ -15,6 +17,7 @@ import {
   StatChip,
   CambodiaMapView,
   BinaryRatingButtons,
+  LocateButton,
 } from '../../components';
 import { colors, spacing, typography } from '../../theme';
 import {
@@ -22,10 +25,13 @@ import {
   getSegmentScoreColor,
   formatDistance,
   regionFromCoords,
+  regionFromUserLocation,
 } from '../../utils/mapUtils';
 
-export default function ExploreScreen() {
+export default function ExploreScreen({ isFocused, tabNavigation }) {
+  const insets = useSafeAreaInsets();
   const mapRef = useRef(null);
+  const hasZoomedToUser = useRef(false);
   const [segments, setSegments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -43,6 +49,12 @@ export default function ExploreScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isFocused || !userCoords || hasZoomedToUser.current) return;
+    mapRef.current?.animateToRegion(regionFromUserLocation(userCoords), 600);
+    hasZoomedToUser.current = true;
+  }, [isFocused, userCoords]);
+
   async function loadSegments() {
     setLoading(true);
     try {
@@ -59,8 +71,13 @@ export default function ExploreScreen() {
     if (!selected) return;
     setSubmitting(true);
     try {
-      await submitSegmentFeedback(selected.id, isInteresting);
-      Alert.alert('Thanks!', 'Your feedback helps others discover great trails.');
+      const result = await submitSegmentFeedback(selected.id, isInteresting);
+      Alert.alert(
+        'Thanks!',
+        result.updated
+          ? 'Your rating was updated.'
+          : 'Your feedback helps others discover great trails.'
+      );
       setSelected(null);
       loadSegments();
     } catch (err) {
@@ -71,7 +88,9 @@ export default function ExploreScreen() {
   }
 
   const allCoords = segments.flatMap((s) => segmentToCoords(s));
-  const initialRegion = regionFromCoords(allCoords);
+  const initialRegion = userCoords
+    ? regionFromUserLocation(userCoords)
+    : regionFromCoords(allCoords);
 
   return (
     <View style={styles.container}>
@@ -100,34 +119,34 @@ export default function ExploreScreen() {
         })}
       </CambodiaMapView>
 
-      <View style={styles.header}>
+      <View style={[styles.header, { top: insets.top + spacing.sm }]}>
         <Text style={styles.title}>Explore</Text>
         {loading && <ActivityIndicator color={colors.primary} />}
         {locationReady && (
-          <TouchableOpacity
-            style={styles.locateBtn}
+          <LocateButton
             onPress={() => {
               if (userCoords && mapRef.current) {
-                mapRef.current.animateToRegion(
-                  {
-                    latitude: userCoords.latitude,
-                    longitude: userCoords.longitude,
-                    latitudeDelta: 0.02,
-                    longitudeDelta: 0.02,
-                  },
-                  400
-                );
+                mapRef.current.animateToRegion(regionFromUserLocation(userCoords), 400);
               }
             }}
-          >
-            <StatChip value="● You" />
-          </TouchableOpacity>
+          />
         )}
       </View>
 
       {!loading && segments.length === 0 && (
         <View style={styles.emptyBanner}>
           <Text style={styles.emptyText}>No segments yet. Record a path to get started.</Text>
+          {tabNavigation && (
+            <TouchableOpacity
+              style={styles.recordLink}
+              onPress={() => tabNavigation.navigate('Record')}
+              accessibilityRole="button"
+              accessibilityLabel="Go to Record trail"
+            >
+              <Text style={styles.recordLinkText}>Go to Record trail</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -166,7 +185,6 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   header: {
     position: 'absolute',
-    top: 48,
     left: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
@@ -189,6 +207,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   emptyText: { ...typography.body, textAlign: 'center' },
+  recordLink: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    minHeight: 44,
+  },
+  recordLinkText: { color: colors.primary, fontWeight: '600', fontSize: 15 },
   sheetTitle: { ...typography.h2, marginBottom: spacing.xs },
   sheetId: { ...typography.caption, marginBottom: spacing.lg },
   statsRow: {
@@ -198,5 +225,4 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   feedbackPrompt: { ...typography.label, marginBottom: spacing.md },
-  locateBtn: { marginLeft: spacing.sm },
 });

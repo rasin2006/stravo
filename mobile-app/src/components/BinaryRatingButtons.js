@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../theme';
 
 export default function BinaryRatingButtons({
@@ -17,12 +18,15 @@ export default function BinaryRatingButtons({
         onPress={onPositive}
         disabled={disabled || loading}
         activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={positiveLabel}
+        accessibilityState={{ disabled: disabled || loading }}
       >
         {loading ? (
           <ActivityIndicator color={colors.onPrimary} />
         ) : (
           <>
-            <Text style={styles.icon}>+</Text>
+            <Ionicons name="thumbs-up" size={22} color={colors.onPrimary} />
             <Text style={styles.positiveText}>{positiveLabel}</Text>
           </>
         )}
@@ -32,8 +36,11 @@ export default function BinaryRatingButtons({
         onPress={onNegative}
         disabled={disabled || loading}
         activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={negativeLabel}
+        accessibilityState={{ disabled }}
       >
-        <Text style={styles.iconNegative}>−</Text>
+        <Ionicons name="thumbs-down" size={22} color={colors.destructive} />
         <Text style={styles.negativeText}>{negativeLabel}</Text>
       </TouchableOpacity>
     </View>
@@ -53,6 +60,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
   },
   positive: {
     backgroundColor: colors.primary,
@@ -65,30 +73,16 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-  icon: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.onPrimary,
-    lineHeight: 24,
-  },
-  iconNegative: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.destructive,
-    lineHeight: 24,
-  },
   positiveText: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.onPrimary,
-    marginTop: 2,
     textAlign: 'center',
   },
   negativeText: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.destructive,
-    marginTop: 2,
     textAlign: 'center',
   },
 });
