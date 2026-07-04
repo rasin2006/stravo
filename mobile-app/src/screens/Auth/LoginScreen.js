@@ -28,7 +28,7 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       const data = await login({ identifier, password });
-      setToken(data.token);
+      await setToken(data.token);
       navigation.navigate('Main');
     } catch (err) {
       Alert.alert('Login failed', err.response?.data?.message || err.message);

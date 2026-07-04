@@ -1,5 +1,6 @@
-const { Activity } = require('../models');
+const { Activity, ActivityPoint, ActivitySegment } = require('../models');
 const { createActivityFromPoints } = require('../services/activityUploadService');
+const { ValidationError } = require('../utils/errors');
 
 exports.createActivity = async (req, res, next) => {
   try {
@@ -7,7 +8,7 @@ exports.createActivity = async (req, res, next) => {
     const activity = await createActivityFromPoints(req.user.id, title, points);
     res.status(201).json(activity);
   } catch (err) {
-    if (err.message.includes('required')) {
+    if (err instanceof ValidationError) {
       return res.status(400).json({ message: err.message });
     }
     next(err);
@@ -25,8 +26,8 @@ exports.listActivities = async (req, res, next) => {
 
 exports.getActivity = async (req, res, next) => {
   try {
-    const { ActivityPoint, ActivitySegment } = require('../models');
-    const activity = await Activity.findByPk(req.params.id, {
+    const activity = await Activity.findOne({
+      where: { id: req.params.id, userId: req.user.id },
       include: [
         { model: ActivityPoint, as: 'points' },
         { model: ActivitySegment, as: 'activitySegments' },

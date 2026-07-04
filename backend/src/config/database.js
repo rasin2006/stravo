@@ -19,7 +19,9 @@ if (isPostgres) {
   });
 } else {
   const path = require('path');
-  const dbPath = path.resolve(__dirname, '..', '..', 'backend_dev.sqlite');
+  const dbPath = process.env.SQLITE_STORAGE
+    ? path.resolve(process.env.SQLITE_STORAGE)
+    : path.resolve(__dirname, '..', '..', 'backend_dev.sqlite');
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: dbPath,

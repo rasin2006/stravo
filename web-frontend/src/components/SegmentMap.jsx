@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
 import { LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -16,29 +16,32 @@ const cambodiaBounds = new LatLngBounds(
   CAMBODIA_LEAFLET_BOUNDS[1]
 );
 
+const USER_ZOOM = 16;
+
 function MapOverlays({ userLocation, onUserLocation, onLocationError }) {
   return (
     <>
       <UserLocationLayer onLocation={onUserLocation} onError={onLocationError} />
-      <LocateMeButton location={userLocation} />
+      <LocateMeButton location={userLocation} zoom={USER_ZOOM} />
     </>
   );
 }
 
-function FitBounds({ segments, selectedId }) {
+function InitialUserZoom({ userLocation }) {
   const map = useMap();
+  const hasZoomed = useRef(false);
 
   useEffect(() => {
-    const coords = segments.flatMap((s) => {
-      const path = s.segmentPath;
-      if (!path?.coordinates) return [];
-      return path.coordinates.map(([lng, lat]) => [lat, lng]);
-    });
+    if (!userLocation || hasZoomed.current) return;
+    map.setView([userLocation.latitude, userLocation.longitude], USER_ZOOM, { animate: true });
+    hasZoomed.current = true;
+  }, [userLocation, map]);
 
-    if (coords.length > 0) {
-      map.fitBounds(coords, { padding: [40, 40], maxZoom: CAMBODIA_MAX_ZOOM });
-    }
-  }, [segments, map]);
+  return null;
+}
+
+function FitSelectedSegment({ segments, selectedId }) {
+  const map = useMap();
 
   useEffect(() => {
     if (!selectedId) return;
@@ -53,10 +56,15 @@ function FitBounds({ segments, selectedId }) {
 }
 
 export default function SegmentMap({ segments, selectedId, onSelect, userLocation, onUserLocation, onLocationError }) {
+  const center = userLocation
+    ? [userLocation.latitude, userLocation.longitude]
+    : [CAMBODIA_CENTER.latitude, CAMBODIA_CENTER.longitude];
+  const zoom = userLocation ? USER_ZOOM : CAMBODIA_MIN_ZOOM;
+
   return (
     <MapContainer
-      center={[CAMBODIA_CENTER.latitude, CAMBODIA_CENTER.longitude]}
-      zoom={CAMBODIA_MIN_ZOOM}
+      center={center}
+      zoom={zoom}
       minZoom={CAMBODIA_MIN_ZOOM}
       maxZoom={CAMBODIA_MAX_ZOOM}
       maxBounds={cambodiaBounds}
@@ -72,7 +80,8 @@ export default function SegmentMap({ segments, selectedId, onSelect, userLocatio
         updateWhenIdle
         updateWhenZooming={false}
       />
-      <FitBounds segments={segments} selectedId={selectedId} />
+      <InitialUserZoom userLocation={userLocation} />
+      <FitSelectedSegment segments={segments} selectedId={selectedId} />
       <MapOverlays
         userLocation={userLocation}
         onUserLocation={onUserLocation}

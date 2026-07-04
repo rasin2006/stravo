@@ -1,4 +1,4 @@
-const { ActivitySegment, SegmentFeedback } = require('../models'); // Use ActivitySegment
+const { ActivitySegment, SegmentFeedback } = require('../models');
 
 function enrichSegment(segment) {
   const data = segment.toJSON ? segment.toJSON() : segment;
@@ -32,6 +32,9 @@ exports.getSegment = async (req, res, next) => {
     const segment = await ActivitySegment.findByPk(req.params.id, {
       include: [{ model: SegmentFeedback, as: 'feedback' }],
     });
+    if (!segment) {
+      return res.status(404).json({ message: 'Segment not found' });
+    }
     res.json(enrichSegment(segment));
   } catch (err) {
     next(err);
