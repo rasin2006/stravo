@@ -2,7 +2,6 @@ const sequelize = require('../config/database');
 const { Activity, ActivityPoint } = require('../models');
 const { calculateDistance } = require('./activityService');
 const { splitAndCreateSegments } = require('./segmentService');
-const { isPostgres } = require('../config/dbTypes');
 
 function normalizePoint(point) {
   return {
@@ -29,9 +28,7 @@ exports.createActivityFromPoints = async (userId, title, rawPoints) => {
   );
 
   const firstPoint = points[0];
-  const startLocation = isPostgres
-    ? { type: 'Point', coordinates: [firstPoint.longitude, firstPoint.latitude] }
-    : `${firstPoint.latitude},${firstPoint.longitude}`;
+  const startLocation = `${firstPoint.latitude},${firstPoint.longitude}`;
 
   return sequelize.transaction(async (transaction) => {
     const activity = await Activity.create(

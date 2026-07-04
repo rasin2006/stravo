@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
-const { uuidPrimaryKey, uuidForeignKey, isPostgres } = require('../config/dbTypes');
+const { uuidPrimaryKey, uuidForeignKey } = require('../config/dbTypes');
 
 const Activity = sequelize.define('Activity', {
   id: uuidPrimaryKey(),
@@ -10,7 +10,7 @@ const Activity = sequelize.define('Activity', {
   durationSeconds: { type: DataTypes.INTEGER, allowNull: false },
   elevationGainMeters: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
   startLocation: {
-    type: isPostgres ? DataTypes.GEOGRAPHY('POINT') : DataTypes.TEXT,
+    type: DataTypes.TEXT,
     allowNull: true,
   },
 });

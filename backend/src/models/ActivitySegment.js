@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
-const { uuidPrimaryKey, uuidForeignKey, isPostgres } = require('../config/dbTypes');
+const { uuidPrimaryKey, uuidForeignKey } = require('../config/dbTypes');
 
 const ActivitySegment = sequelize.define('ActivitySegment', {
   id: uuidPrimaryKey(),
@@ -14,11 +14,11 @@ const ActivitySegment = sequelize.define('ActivitySegment', {
     allowNull: false,
   },
   segmentPath: {
-    type: isPostgres ? DataTypes.GEOMETRY('LineString', 4326) : DataTypes.TEXT,
+    type: DataTypes.TEXT,
     allowNull: true,
     get() {
       const raw = this.getDataValue('segmentPath');
-      if (!raw || isPostgres) return raw;
+      if (!raw) return raw;
       try {
         return JSON.parse(raw);
       } catch {
@@ -30,10 +30,7 @@ const ActivitySegment = sequelize.define('ActivitySegment', {
         this.setDataValue('segmentPath', null);
         return;
       }
-      this.setDataValue(
-        'segmentPath',
-        isPostgres ? value : JSON.stringify(value)
-      );
+      this.setDataValue('segmentPath', JSON.stringify(value));
     },
   },
   lengthMeters: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
