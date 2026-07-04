@@ -165,6 +165,9 @@ export default function RecordPage() {
           <Link to="/" className="text-sm font-medium text-primary hover:underline">
             Home
           </Link>
+          <Link to="/record/manual" className="text-sm font-medium text-primary hover:underline">
+            Manual pins
+          </Link>
           <h1 className="font-display text-lg font-bold text-foreground sm:text-xl">Record trail</h1>
         </div>
         {loggedIn ? (

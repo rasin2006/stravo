@@ -29,6 +29,9 @@ export default function HomePage() {
             <Link to="/record" className="text-foreground hover:text-primary">
               Record
             </Link>
+            <Link to="/record/manual" className="text-foreground hover:text-primary">
+              Manual pins
+            </Link>
             <Link to="/explore" className="text-foreground hover:text-primary">
               Explore
             </Link>
@@ -51,6 +54,9 @@ export default function HomePage() {
           <div className="mt-8 flex flex-wrap gap-4">
             <Link to="/record">
               <Button>Record trail</Button>
+            </Link>
+            <Link to="/record/manual">
+              <Button variant="outline">Drop pins manually</Button>
             </Link>
             <Link to="/explore">
               <Button variant="outline">Explore map</Button>

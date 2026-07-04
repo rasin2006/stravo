@@ -59,3 +59,24 @@ export function pathDistanceMeters(points) {
   }
   return total;
 }
+
+export function pinsToUploadPoints(pins, secondsBetween = 60) {
+  const base = Date.now();
+  return pins.map((pin, index) => ({
+    latitude: pin.latitude,
+    longitude: pin.longitude,
+    timestamp: new Date(base + index * secondsBetween * 1000).toISOString(),
+    elevation: null,
+    accuracy: null,
+  }));
+}
+
+export function pinPlaceFeedback(pins) {
+  return pins
+    .filter((pin) => pin.isInteresting !== null)
+    .map((pin) => ({
+      latitude: pin.latitude,
+      longitude: pin.longitude,
+      isInteresting: pin.isInteresting,
+    }));
+}
