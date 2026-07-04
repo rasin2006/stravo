@@ -9,9 +9,11 @@ let stopCheckInterval = null;
 let isRecording = false;
 let points = [];
 let places = [];
-let recordedStopStarts = new Set();
 let startedAt = null;
 let listeners = new Set();
+let lastKnownPosition = null;
+let stopAnchor = null;
+let lastRecordedStopAt = null;
 
 function haversineMeters(a, b) {
   const R = 6371000;
@@ -26,10 +28,82 @@ function haversineMeters(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
-function clusterCentroid(cluster) {
-  const latitude = cluster.reduce((sum, p) => sum + p.latitude, 0) / cluster.length;
-  const longitude = cluster.reduce((sum, p) => sum + p.longitude, 0) / cluster.length;
-  return { latitude, longitude };
+function stopRadiusFor(position) {
+  const accuracy = position.accuracy ?? 15;
+  return Math.max(STOP_RADIUS_METERS, Math.min(accuracy, 30));
+}
+
+function getStopProgress() {
+  if (!isRecording || !stopAnchor) {
+    return { elapsedSeconds: 0, requiredSeconds: STOP_DURATION_MS / 1000, isHolding: false };
+  }
+  const elapsedMs = Date.now() - stopAnchor.since;
+  return {
+    elapsedSeconds: Math.min(Math.floor(elapsedMs / 1000), STOP_DURATION_MS / 1000),
+    requiredSeconds: STOP_DURATION_MS / 1000,
+    isHolding: elapsedMs >= 3000,
+  };
+}
+
+function alreadyRecordedNear(position) {
+  return places.some(
+    (place) => haversineMeters(place, position) <= stopRadiusFor(position)
+  );
+}
+
+function recordPlace(position) {
+  if (alreadyRecordedNear(position)) return;
+
+  lastRecordedStopAt = {
+    latitude: position.latitude,
+    longitude: position.longitude,
+  };
+
+  places.push({
+    id: `place-${Date.now()}-${places.length}`,
+    latitude: position.latitude,
+    longitude: position.longitude,
+    startedAt: new Date(stopAnchor.since).toISOString(),
+    recordedAt: new Date().toISOString(),
+    isInteresting: null,
+  });
+}
+
+function updateStopTracking(position) {
+  if (!isRecording) return;
+
+  const radius = stopRadiusFor(position);
+
+  if (!stopAnchor) {
+    stopAnchor = {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      since: Date.now(),
+    };
+    return;
+  }
+
+  const moved = haversineMeters(stopAnchor, position) > radius;
+  if (moved) {
+    stopAnchor = {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      since: Date.now(),
+    };
+    return;
+  }
+
+  const elapsed = Date.now() - stopAnchor.since;
+  if (elapsed < STOP_DURATION_MS) return;
+
+  if (
+    lastRecordedStopAt &&
+    haversineMeters(lastRecordedStopAt, position) <= radius
+  ) {
+    return;
+  }
+
+  recordPlace(position);
 }
 
 function notify() {
@@ -37,64 +111,33 @@ function notify() {
     fn({
       isRecording,
       points: [...points],
-      places: [...places],
+      places: places.map((place) => ({ ...place })),
       startedAt,
+      stopProgress: getStopProgress(),
     })
   );
 }
 
-function detectPlace() {
-  if (points.length < 2) return;
-
-  const lastIdx = points.length - 1;
-  const anchor = points[lastIdx];
-  let startIdx = lastIdx;
-
-  while (startIdx > 0) {
-    const prev = points[startIdx - 1];
-    if (haversineMeters(anchor, prev) <= STOP_RADIUS_METERS) {
-      startIdx -= 1;
-    } else {
-      break;
-    }
-  }
-
-  if (recordedStopStarts.has(startIdx)) return;
-
-  const startTime = new Date(points[startIdx].timestamp).getTime();
-  const endTime = isRecording ? Date.now() : new Date(anchor.timestamp).getTime();
-  if (endTime - startTime < STOP_DURATION_MS) return;
-
-  const cluster = points.slice(startIdx, lastIdx + 1);
-  const { latitude, longitude } = clusterCentroid(cluster);
-
-  recordedStopStarts.add(startIdx);
-  places.push({
-    id: `place-${startIdx}-${Date.now()}`,
-    latitude,
-    longitude,
-    startedAt: points[startIdx].timestamp,
-    recordedAt: new Date(endTime).toISOString(),
-    isInteresting: null,
-  });
-  notify();
-}
-
-function clearStopCheckInterval() {
-  if (stopCheckInterval != null) {
-    clearInterval(stopCheckInterval);
-    stopCheckInterval = null;
-  }
-}
-
 export function subscribeRecording(callback) {
   listeners.add(callback);
-  callback({ isRecording, points: [...points], places: [...places], startedAt });
+  callback({
+    isRecording,
+    points: [...points],
+    places: places.map((place) => ({ ...place })),
+    startedAt,
+    stopProgress: getStopProgress(),
+  });
   return () => listeners.delete(callback);
 }
 
 export function getRecordingState() {
-  return { isRecording, points: [...points], places: [...places], startedAt };
+  return {
+    isRecording,
+    points: [...points],
+    places: places.map((place) => ({ ...place })),
+    startedAt,
+    stopProgress: getStopProgress(),
+  };
 }
 
 export function getPendingPlace() {
@@ -102,9 +145,9 @@ export function getPendingPlace() {
 }
 
 export function ratePlace(placeId, isInteresting) {
-  const place = places.find((p) => p.id === placeId);
-  if (!place) return;
-  place.isInteresting = isInteresting;
+  const idx = places.findIndex((p) => p.id === placeId);
+  if (idx === -1) return;
+  places[idx] = { ...places[idx], isInteresting };
   notify();
 }
 
@@ -118,7 +161,7 @@ export function getPlaceFeedback() {
     }));
 }
 
-function appendPoint(pos) {
+function ingestPosition(pos) {
   const next = {
     latitude: pos.coords.latitude,
     longitude: pos.coords.longitude,
@@ -127,15 +170,33 @@ function appendPoint(pos) {
     timestamp: new Date(pos.timestamp || Date.now()).toISOString(),
   };
 
+  lastKnownPosition = next;
+  updateStopTracking(next);
+
   const last = points[points.length - 1];
   if (last) {
     const dist = haversineMeters(last, next);
-    if (dist < MIN_DISTANCE_METERS) return;
+    if (dist < MIN_DISTANCE_METERS) {
+      notify();
+      return;
+    }
   }
 
   points.push(next);
-  detectPlace();
   notify();
+}
+
+function tickStopCheck() {
+  if (!isRecording || !lastKnownPosition) return;
+  updateStopTracking(lastKnownPosition);
+  notify();
+}
+
+function clearStopCheckInterval() {
+  if (stopCheckInterval != null) {
+    clearInterval(stopCheckInterval);
+    stopCheckInterval = null;
+  }
 }
 
 export function startRecording(onError) {
@@ -148,17 +209,19 @@ export function startRecording(onError) {
 
   return new Promise((resolve) => {
     watchId = navigator.geolocation.watchPosition(
-      (pos) => appendPoint(pos),
+      (pos) => ingestPosition(pos),
       (err) => onError?.(err.message),
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     );
     isRecording = true;
     points = [];
     places = [];
-    recordedStopStarts = new Set();
+    lastKnownPosition = null;
+    stopAnchor = null;
+    lastRecordedStopAt = null;
     startedAt = Date.now();
     clearStopCheckInterval();
-    stopCheckInterval = setInterval(detectPlace, 5000);
+    stopCheckInterval = setInterval(tickStopCheck, 1000);
     notify();
     resolve(true);
   });
@@ -170,7 +233,7 @@ export function stopRecording() {
     watchId = null;
   }
   clearStopCheckInterval();
-  detectPlace();
+  if (lastKnownPosition) updateStopTracking(lastKnownPosition);
   isRecording = false;
   const snapshot = [...points];
   notify();
@@ -186,7 +249,9 @@ export function clearRecording() {
   isRecording = false;
   points = [];
   places = [];
-  recordedStopStarts = new Set();
+  lastKnownPosition = null;
+  stopAnchor = null;
+  lastRecordedStopAt = null;
   startedAt = null;
   notify();
 }
