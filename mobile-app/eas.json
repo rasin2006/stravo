@@ -1,0 +1,29 @@
+{
+  "cli": {
+    "version": ">= 5.9.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "API_BASE_URL": "http://localhost:4000/api"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "API_BASE_URL": "https://stravo-api.fly.dev/api"
+      }
+    },
+    "production": {
+      "env": {
+        "API_BASE_URL": "https://stravo-api.fly.dev/api"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -1,0 +1,18 @@
+export default {
+  primary: '#2D6A4F',
+  onPrimary: '#FFFFFF',
+  secondary: '#52796F',
+  accent: '#D4A373',
+  route: '#2563EB',
+  background: '#F7F5F0',
+  surface: '#FFFFFF',
+  foreground: '#1B4332',
+  muted: '#64748B',
+  border: '#E2E8D8',
+  destructive: '#DC2626',
+  recording: '#EF4444',
+  scoreHigh: '#2D6A4F',
+  scoreMid: '#94A3B8',
+  scoreLow: '#DC2626',
+  mapDark: '#0F172A',
+};

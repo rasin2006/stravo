@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Local databases
+*.sqlite
+*.sqlite3
+
+# Build output
+dist/
+build/
+web-frontend/dist/
+
+# Expo / React Native
+mobile-app/.expo/
+mobile-app/dist/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# OS & IDE
+.DS_Store
+.idea/
+.vscode/
+*.log
+Untitled-1.sql
+
+# Fly
+.fly/
