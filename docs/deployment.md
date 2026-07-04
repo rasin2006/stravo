@@ -49,7 +49,17 @@ git push -u origin main
 
 Add repo secret for CI:
 
-- `FLY_API_TOKEN` — from `fly tokens create deploy`
+```bash
+# Org token — works for stravo-api AND stravo-web (apps do not need to exist yet)
+fly tokens create org -x 999999h -o personal
+
+# Copy the token, then:
+gh secret set FLY_API_TOKEN --repo rasin2006/stravo
+```
+
+Or paste manually at https://github.com/rasin2006/stravo/settings/secrets/actions
+
+**Do not use** `fly tokens create deploy` from the repo root — that requires an existing app and causes `Could not find App`.
 
 Pushes to `main` auto-deploy via [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml).
 
