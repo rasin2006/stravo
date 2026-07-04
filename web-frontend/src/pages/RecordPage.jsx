@@ -25,6 +25,7 @@ export default function RecordPage() {
     points: [],
     places: [],
     startedAt: null,
+    stopProgress: { elapsedSeconds: 0, requiredSeconds: 30, isHolding: false },
   });
   const [pendingUpload, setPendingUpload] = useState(null);
   const [duration, setDuration] = useState(0);
@@ -42,7 +43,7 @@ export default function RecordPage() {
   const [authLoading, setAuthLoading] = useState(false);
   const [tabHiddenWarning, setTabHiddenWarning] = useState(false);
 
-  const { isRecording, points, places } = recordingState;
+  const { isRecording, points, places, stopProgress } = recordingState;
   const displayPoints = pendingUpload ?? points;
   const pendingPlace = places.find((p) => p.isInteresting === null) ?? null;
   const unratedPlaces = places.filter((p) => p.isInteresting === null);
@@ -164,6 +165,9 @@ export default function RecordPage() {
           <Link to="/" className="text-sm font-medium text-primary hover:underline">
             Home
           </Link>
+          <Link to="/record/manual" className="text-sm font-medium text-primary hover:underline">
+            Manual pins
+          </Link>
           <h1 className="font-display text-lg font-bold text-foreground sm:text-xl">Record trail</h1>
         </div>
         {loggedIn ? (
@@ -191,23 +195,6 @@ export default function RecordPage() {
           onUserLocation={setUserLocation}
           onLocationError={setLocationError}
         />
-
-        {pendingPlace && (isRecording || pendingUpload) && (
-          <Card className="absolute left-4 right-4 top-4 z-[1002] mx-auto max-w-md border-2 border-primary/30 shadow-sheet">
-            <p className="font-display text-base font-bold text-foreground">Place recorded</p>
-            <p className="mt-1 text-sm text-muted">
-              You paused ~30s in a ~10 m area. Rate it now or review later.
-            </p>
-            <div className="mt-3">
-              <BinaryRatingButtons
-                positiveLabel="Interesting"
-                negativeLabel="Not interesting"
-                onPositive={() => ratePlace(pendingPlace.id, true)}
-                onNegative={() => ratePlace(pendingPlace.id, false)}
-              />
-            </div>
-          </Card>
-        )}
 
         {tabHiddenWarning && (
           <div className="absolute left-4 right-4 top-4 z-[1001] rounded-lg bg-recording px-4 py-2 text-center text-sm font-semibold text-white shadow-sheet">
@@ -265,6 +252,30 @@ export default function RecordPage() {
             </>
           )}
 
+          {showStop && pendingPlace && (
+            <div className="mb-3 rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
+              <p className="font-display text-base font-bold text-foreground">Place recorded</p>
+              <p className="mt-1 text-sm text-muted">
+                You paused ~30s in a ~10 m area. Rate it now or review later.
+              </p>
+              <div className="mt-3">
+                <BinaryRatingButtons
+                  positiveLabel="Interesting"
+                  negativeLabel="Not interesting"
+                  onPositive={() => ratePlace(pendingPlace.id, true)}
+                  onNegative={() => ratePlace(pendingPlace.id, false)}
+                />
+              </div>
+            </div>
+          )}
+
+          {showStop && !pendingPlace && stopProgress?.isHolding && (
+            <p className="mb-3 rounded-lg bg-background px-3 py-2 text-sm text-muted">
+              Holding still… {stopProgress.elapsedSeconds}s / {stopProgress.requiredSeconds}s to
+              record a place
+            </p>
+          )}
+
           {showStop && (
             <>
               <p className="mb-3 text-sm text-muted">
@@ -273,13 +284,27 @@ export default function RecordPage() {
               </p>
               {unratedPlaces.length > 1 && (
                 <p className="mb-3 text-xs text-muted">
-                  {unratedPlaces.length} places waiting for review — use the buttons above the map.
+                  {unratedPlaces.length} places waiting for review.
                 </p>
               )}
               <Button variant="outline" className="w-full" onClick={handleStop}>
                 Stop recording
               </Button>
             </>
+          )}
+
+          {showUpload && pendingPlace && (
+            <div className="mb-3 rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
+              <p className="font-display text-base font-bold text-foreground">Rate this place</p>
+              <div className="mt-3">
+                <BinaryRatingButtons
+                  positiveLabel="Interesting"
+                  negativeLabel="Not interesting"
+                  onPositive={() => ratePlace(pendingPlace.id, true)}
+                  onNegative={() => ratePlace(pendingPlace.id, false)}
+                />
+              </div>
+            </div>
           )}
 
           {showUpload && places.length > 0 && (

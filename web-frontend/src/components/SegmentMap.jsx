@@ -8,6 +8,7 @@ import {
   CAMBODIA_CENTER,
   CAMBODIA_LEAFLET_BOUNDS,
   CAMBODIA_MIN_ZOOM,
+  CAMBODIA_TILE_MAX_ZOOM,
   CAMBODIA_MAX_ZOOM,
 } from '../config/cambodia';
 
@@ -76,6 +77,9 @@ export default function SegmentMap({ segments, selectedId, onSelect, userLocatio
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         bounds={cambodiaBounds}
+        minZoom={CAMBODIA_MIN_ZOOM}
+        maxNativeZoom={CAMBODIA_TILE_MAX_ZOOM}
+        maxZoom={CAMBODIA_MAX_ZOOM}
         keepBuffer={1}
         updateWhenIdle
         updateWhenZooming={false}

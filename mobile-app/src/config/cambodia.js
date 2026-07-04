@@ -13,7 +13,9 @@ export const CAMBODIA_CENTER = {
 };
 
 export const CAMBODIA_MIN_ZOOM = 7;
-export const CAMBODIA_MAX_ZOOM = 16;
+export const CAMBODIA_TILE_MAX_ZOOM = 19;
+/** ~50 m radius can fill the screen at this level (street-scale pin placement). */
+export const CAMBODIA_MAX_ZOOM = 20;
 
 export const CAMBODIA_DEFAULT_REGION = {
   latitude: CAMBODIA_CENTER.latitude,

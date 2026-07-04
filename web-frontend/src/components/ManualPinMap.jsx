@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
 import { LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import UserLocationLayer, { LocateMeButton } from './UserLocationLayer';
@@ -31,31 +31,47 @@ function InitialUserZoom({ userLocation }) {
   return null;
 }
 
-function FitRecordingPath({ points, isRecording }) {
+function FitPins({ pins }) {
   const map = useMap();
   const lastLen = useRef(0);
 
   useEffect(() => {
-    if (points.length < 2 || points.length === lastLen.current) return;
-    lastLen.current = points.length;
-    if (!isRecording) return;
-    const coords = points.map((p) => [p.latitude, p.longitude]);
+    if (pins.length < 1 || pins.length === lastLen.current) return;
+    lastLen.current = pins.length;
+    const coords = pins.map((p) => [p.latitude, p.longitude]);
+    if (coords.length === 1) {
+      map.setView(coords[0], Math.max(map.getZoom(), USER_ZOOM), { animate: true });
+      return;
+    }
     map.fitBounds(coords, { padding: [100, 100], maxZoom: CAMBODIA_MAX_ZOOM });
-  }, [points, isRecording, map]);
+  }, [pins, map]);
 
   return null;
 }
 
-function placeColor(place) {
-  if (place.isInteresting === true) return { color: '#16A34A', fillColor: '#22C55E' };
-  if (place.isInteresting === false) return { color: '#DC2626', fillColor: '#EF4444' };
-  return { color: '#D97706', fillColor: '#F59E0B' };
+function MapClickHandler({ onAddPin, disabled }) {
+  useMapEvents({
+    click(e) {
+      if (disabled) return;
+      onAddPin({ latitude: e.latlng.lat, longitude: e.latlng.lng });
+    },
+  });
+  return null;
 }
 
-export default function RecordMap({
-  points,
-  places = [],
-  isRecording,
+function pinColor(pin, selectedId) {
+  if (pin.id === selectedId) return { color: '#2563EB', fillColor: '#3B82F6' };
+  if (pin.isInteresting === true) return { color: '#16A34A', fillColor: '#22C55E' };
+  if (pin.isInteresting === false) return { color: '#DC2626', fillColor: '#EF4444' };
+  return { color: '#64748B', fillColor: '#94A3B8' };
+}
+
+export default function ManualPinMap({
+  pins,
+  selectedPinId,
+  onAddPin,
+  onSelectPin,
+  readOnly = false,
   userLocation,
   onUserLocation,
   onLocationError,
@@ -64,7 +80,7 @@ export default function RecordMap({
     ? [userLocation.latitude, userLocation.longitude]
     : [CAMBODIA_CENTER.latitude, CAMBODIA_CENTER.longitude];
   const zoom = userLocation ? USER_ZOOM : CAMBODIA_MIN_ZOOM;
-  const pathPositions = points.map((p) => [p.latitude, p.longitude]);
+  const pathPositions = pins.map((p) => [p.latitude, p.longitude]);
 
   return (
     <MapContainer
@@ -74,7 +90,7 @@ export default function RecordMap({
       maxZoom={CAMBODIA_MAX_ZOOM}
       maxBounds={cambodiaBounds}
       maxBoundsViscosity={1}
-      className="relative h-full w-full"
+      className="relative h-full w-full cursor-crosshair"
       scrollWheelZoom
     >
       <TileLayer
@@ -89,27 +105,34 @@ export default function RecordMap({
         updateWhenZooming={false}
       />
       <InitialUserZoom userLocation={userLocation} />
-      <FitRecordingPath points={points} isRecording={isRecording} />
+      <FitPins pins={pins} />
       <UserLocationLayer onLocation={onUserLocation} onError={onLocationError} />
       <LocateMeButton location={userLocation} zoom={USER_ZOOM} />
+      {!readOnly && <MapClickHandler onAddPin={onAddPin} disabled={readOnly} />}
       {pathPositions.length > 1 && (
         <Polyline
           positions={pathPositions}
-          pathOptions={{ color: '#2563EB', weight: 5, opacity: 0.9 }}
+          pathOptions={{ color: '#2563EB', weight: 5, opacity: 0.9, dashArray: '8 6' }}
         />
       )}
-      {places.map((place) => {
-        const { color, fillColor } = placeColor(place);
+      {pins.map((pin) => {
+        const { color, fillColor } = pinColor(pin, selectedPinId);
         return (
           <CircleMarker
-            key={place.id}
-            center={[place.latitude, place.longitude]}
-            radius={10}
+            key={pin.id}
+            center={[pin.latitude, pin.longitude]}
+            radius={12}
             pathOptions={{
               color,
               fillColor,
-              fillOpacity: 0.85,
+              fillOpacity: 0.9,
               weight: 2,
+            }}
+            eventHandlers={{
+              click: (e) => {
+                e.originalEvent.stopPropagation();
+                onSelectPin?.(pin.id);
+              },
             }}
           />
         );

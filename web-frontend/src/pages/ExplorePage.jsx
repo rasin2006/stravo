@@ -109,7 +109,10 @@ export default function ExplorePage() {
             ← Home
           </Link>
           <Link to="/record" className="text-sm font-medium text-primary hover:underline">
-            Record
+            GPS record
+          </Link>
+          <Link to="/record/manual" className="text-sm font-medium text-primary hover:underline">
+            Manual pins
           </Link>
           <h1 className="font-display text-xl font-bold text-foreground">Explore Segments</h1>
         </div>
