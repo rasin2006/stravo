@@ -51,7 +51,7 @@ export default function UserLocationLayer({ onLocation, onError }) {
   );
 }
 
-export function LocateMeButton({ location }) {
+export function LocateMeButton({ location, zoom = 14 }) {
   const map = useMap();
 
   if (!location) return null;
@@ -60,7 +60,7 @@ export function LocateMeButton({ location }) {
     <button
       type="button"
       onClick={() =>
-        map.setView([location.latitude, location.longitude], Math.max(map.getZoom(), 14), {
+        map.setView([location.latitude, location.longitude], Math.max(map.getZoom(), zoom), {
           animate: true,
         })
       }

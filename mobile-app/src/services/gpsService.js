@@ -5,15 +5,22 @@ let recordedPoints = [];
 let watchSubscription = null;
 let recordingStartedAt = null;
 let pointListeners = [];
+let recordingListeners = [];
 let userLocationSubscription = null;
 let userLocationListeners = [];
+let lastUserLocation = null;
 
 function notifyListeners() {
   const snapshot = [...recordedPoints];
   pointListeners.forEach((fn) => fn(snapshot));
 }
 
+function notifyRecordingState() {
+  recordingListeners.forEach((fn) => fn(isRecording));
+}
+
 function notifyUserLocation(location) {
+  lastUserLocation = location;
   userLocationListeners.forEach((fn) => fn(location));
 }
 
@@ -25,16 +32,49 @@ export function subscribeToPoints(callback) {
   };
 }
 
+export function subscribeToRecordingState(callback) {
+  recordingListeners.push(callback);
+  callback(isRecording);
+  return () => {
+    recordingListeners = recordingListeners.filter((fn) => fn !== callback);
+  };
+}
+
 export function subscribeToUserLocation(callback) {
   userLocationListeners.push(callback);
+  if (lastUserLocation) callback(lastUserLocation);
   return () => {
     userLocationListeners = userLocationListeners.filter((fn) => fn !== callback);
   };
 }
 
+export function getLastUserLocation() {
+  return lastUserLocation;
+}
+
 export async function ensureLocationPermission() {
   const { status } = await Location.requestForegroundPermissionsAsync();
   return status === 'granted';
+}
+
+export async function fetchCurrentLocation() {
+  const granted = await ensureLocationPermission();
+  if (!granted) return null;
+
+  try {
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    const coords = {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      accuracy: location.coords.accuracy,
+    };
+    notifyUserLocation(coords);
+    return coords;
+  } catch {
+    return null;
+  }
 }
 
 export async function startUserLocationWatch() {
@@ -76,6 +116,12 @@ export function getIsRecording() {
   return isRecording;
 }
 
+export function clearRecording() {
+  recordedPoints = [];
+  recordingStartedAt = null;
+  notifyListeners();
+}
+
 export async function startRecording() {
   const granted = await ensureLocationPermission();
   if (!granted) {
@@ -85,6 +131,8 @@ export async function startRecording() {
   isRecording = true;
   recordedPoints = [];
   recordingStartedAt = Date.now();
+  notifyRecordingState();
+  notifyListeners();
 
   watchSubscription = await Location.watchPositionAsync(
     {
@@ -111,6 +159,7 @@ export async function stopRecording() {
     watchSubscription = null;
   }
   isRecording = false;
+  notifyRecordingState();
   return [...recordedPoints];
 }
 

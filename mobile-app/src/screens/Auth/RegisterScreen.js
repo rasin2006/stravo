@@ -30,7 +30,7 @@ export default function RegisterScreen({ navigation }) {
     setLoading(true);
     try {
       const data = await register({ name, identifier, password });
-      setToken(data.token);
+      await setToken(data.token);
       navigation.navigate('Main');
     } catch (err) {
       Alert.alert('Registration failed', err.response?.data?.message || err.message);

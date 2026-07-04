@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
+import { StackActions, NavigationActions } from 'react-navigation';
 import { clearToken } from '../../services/tokenStore';
 import { Button, Card } from '../../components';
 import { colors, spacing, typography } from '../../theme';
@@ -11,9 +12,14 @@ export default function ProfileScreen({ navigation }) {
       {
         text: 'Sign out',
         style: 'destructive',
-        onPress: () => {
-          clearToken();
-          navigation.navigate('Login');
+        onPress: async () => {
+          await clearToken();
+          navigation.dispatch(
+            StackActions.reset({
+              index: 0,
+              actions: [NavigationActions.navigate({ routeName: 'Login' })],
+            })
+          );
         },
       },
     ]);

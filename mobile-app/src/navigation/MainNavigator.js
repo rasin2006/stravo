@@ -1,5 +1,6 @@
 import React from 'react';
 import { createStackNavigator } from 'react-navigation-stack';
+import AuthLoadingScreen from '../screens/Auth/AuthLoadingScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
 import TabNavigator from './TabNavigator';
@@ -8,6 +9,10 @@ import { colors } from '../theme';
 
 export default createStackNavigator(
   {
+    AuthLoading: {
+      screen: AuthLoadingScreen,
+      navigationOptions: { headerShown: false },
+    },
     Login: {
       screen: LoginScreen,
       navigationOptions: { headerShown: false },
@@ -30,7 +35,7 @@ export default createStackNavigator(
     },
   },
   {
-    initialRouteName: 'Login',
+    initialRouteName: 'AuthLoading',
     headerMode: 'screen',
   }
 );

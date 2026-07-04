@@ -1,22 +1,36 @@
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-dotenv.config();
+const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/authRoutes');
 const activityRoutes = require('./routes/activityRoutes');
 const segmentRoutes = require('./routes/segmentRoutes');
+const { checkDatabaseConnection } = require('./db/init');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-app.use('/api/auth', authRoutes);
+app.use(cors());
+app.use(express.json({ limit: '1mb' }));
+
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many auth attempts, please try again later' },
+});
+
+app.use('/api/auth', authRateLimiter, authRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/segments', segmentRoutes);
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+app.get('/api/health', async (_req, res) => {
+  try {
+    await checkDatabaseConnection();
+    res.json({ status: 'ok', database: 'connected' });
+  } catch (err) {
+    res.status(503).json({ status: 'error', database: 'disconnected' });
+  }
 });
 
 app.use((err, req, res, next) => {
@@ -24,26 +38,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Server error' });
 });
 
-const sequelize = require('./config/database');
-const { isPostgres } = require('./config/dbTypes');
-const { User, Activity, ActivityPoint, ActivitySegment, SegmentFeedback } = require('./models');
-
-const port = process.env.PORT || 4000;
-
-(async () => {
-  try {
-    // SQLite cannot safely run `alter: true` — it leaves backup tables and
-    // breaks on FK/unique constraints. Only auto-alter on Postgres.
-    await sequelize.sync(isPostgres ? { alter: true } : undefined);
-
-    // No default segment seeding here, as ActivitySegments are user-generated.
-    // If you introduce 'PredefinedSegments' later, you can seed them here.
-
-    app.listen(port, '0.0.0.0', () => {
-      console.log(`Server running on port ${port}`);
-    });
-  } catch (err) {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
-  }
-})();
+module.exports = app;

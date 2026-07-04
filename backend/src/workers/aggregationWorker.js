@@ -1,8 +1,8 @@
-const { SegmentFeedback, Segment } = require('../models');
+const { SegmentFeedback } = require('../models');
 
 async function aggregateSegmentMetrics() {
-  const feedback = await SegmentFeedback.findAll();
-  // TODO: aggregate metrics per segment and persist summary data
+  await SegmentFeedback.findAll();
+  // TODO: aggregate metrics per activity segment and persist summary data
 }
 
 module.exports = { aggregateSegmentMetrics };

@@ -1,4 +1,4 @@
-import { CAMBODIA_DEFAULT_REGION } from '../config/cambodia';
+import { CAMBODIA_DEFAULT_REGION, clampToCambodia } from '../config/cambodia';
 export function segmentToCoords(segment) {
   const path = segment?.segmentPath;
   if (!path) return [];
@@ -90,4 +90,14 @@ export function regionFromCoords(coords, padding = 0.01) {
     latitudeDelta: latDelta,
     longitudeDelta: lngDelta,
   };
+}
+
+/** Tight zoom centered on the user (~400 m view). */
+export function regionFromUserLocation(coords, delta = 0.004) {
+  return clampToCambodia({
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    latitudeDelta: delta,
+    longitudeDelta: delta,
+  });
 }

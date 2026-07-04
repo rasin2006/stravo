@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { getJwtSecret } = require('../config/jwt');
 
 module.exports = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -9,8 +10,12 @@ module.exports = async (req, res, next) => {
 
   const token = authHeader.replace('Bearer ', '');
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkey'); // Added fallback for JWT_SECRET
-    req.user = await User.findByPk(payload.userId);
+    const payload = jwt.verify(token, getJwtSecret());
+    const user = await User.findByPk(payload.userId);
+    if (!user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    req.user = user;
     next();
   } catch (err) {
     res.status(401).json({ message: 'Unauthorized' });
