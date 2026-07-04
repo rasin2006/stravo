@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ManualPinMap from '../components/ManualPinMap';
 import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
-import BinaryRatingButtons from '../components/BinaryRatingButtons';
 import { uploadActivity } from '../services/api';
 import { getToken, isLoggedIn, login, register, logout } from '../services/auth';
 import {
@@ -23,10 +21,152 @@ function createPin(latitude, longitude) {
   };
 }
 
+function TrailControls({
+  title,
+  onTitleChange,
+  pins,
+  distance,
+  locationError,
+  message,
+  uploading,
+  loggedIn,
+  authMode,
+  name,
+  identifier,
+  password,
+  authError,
+  authLoading,
+  onUndoLast,
+  onClear,
+  onUpload,
+  onAuthModeChange,
+  onNameChange,
+  onIdentifierChange,
+  onPasswordChange,
+  onAuthSubmit,
+  onExplore,
+  showAuth,
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => onTitleChange(e.target.value)}
+        placeholder="Trail name"
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none placeholder:text-muted focus:ring-2 focus:ring-primary"
+      />
+
+      <div className="flex flex-wrap gap-2 text-sm">
+        <span className="rounded-pill bg-background px-3 py-1 font-semibold text-foreground">
+          {pins.length} pin{pins.length === 1 ? '' : 's'}
+        </span>
+        <span className="rounded-pill bg-background px-3 py-1 font-semibold text-foreground">
+          {formatDistance(distance)}
+        </span>
+      </div>
+
+      {locationError && <p className="text-xs text-destructive">Location: {locationError}</p>}
+
+      <p className="text-sm text-muted">
+        Tap the map to drop pins. Drag a pin to move it — a rating popup appears above the
+        selected pin.
+      </p>
+
+      <div className="grid grid-cols-3 gap-2">
+        <Button variant="outline" disabled={pins.length === 0 || uploading} onClick={onUndoLast}>
+          Undo
+        </Button>
+        <Button variant="outline" disabled={pins.length === 0 || uploading} onClick={onClear}>
+          Clear
+        </Button>
+        <Button disabled={pins.length < 2 || uploading} onClick={onUpload}>
+          {uploading ? '…' : 'Upload'}
+        </Button>
+      </div>
+
+      {message && <p className="text-sm text-muted">{message}</p>}
+
+      {message.startsWith('Uploaded') && (
+        <button
+          type="button"
+          onClick={onExplore}
+          className="min-h-[44px] text-sm font-semibold text-primary"
+        >
+          Explore community trails →
+        </button>
+      )}
+
+      {showAuth && (
+        <div className="border-t border-border pt-3">
+          <div className="mb-3 flex rounded-lg bg-background p-1">
+            <button
+              type="button"
+              onClick={() => onAuthModeChange('login')}
+              className={`flex-1 min-h-[40px] rounded-md py-1.5 text-xs font-semibold ${
+                authMode === 'login' ? 'bg-surface text-primary shadow-sm' : 'text-muted'
+              }`}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              onClick={() => onAuthModeChange('register')}
+              className={`flex-1 min-h-[40px] rounded-md py-1.5 text-xs font-semibold ${
+                authMode === 'register' ? 'bg-surface text-primary shadow-sm' : 'text-muted'
+              }`}
+            >
+              Register
+            </button>
+          </div>
+          <form onSubmit={onAuthSubmit} className="space-y-2">
+            {authMode === 'register' && (
+              <input
+                type="text"
+                placeholder="Name"
+                value={name}
+                onChange={(e) => onNameChange(e.target.value)}
+                required
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            )}
+            <input
+              type="text"
+              placeholder="Email or phone"
+              value={identifier}
+              onChange={(e) => onIdentifierChange(e.target.value)}
+              autoComplete="username"
+              required
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => onPasswordChange(e.target.value)}
+              required
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+            {authError && <p className="text-xs text-destructive">{authError}</p>}
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full min-h-[44px] rounded-pill bg-primary py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {authLoading ? 'Please wait…' : authMode === 'register' ? 'Create account' : 'Sign in'}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ManualRecordPage() {
   const navigate = useNavigate();
   const [pins, setPins] = useState([]);
   const [selectedPinId, setSelectedPinId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [title, setTitle] = useState('Manual trail');
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
@@ -40,7 +180,6 @@ export default function ManualRecordPage() {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  const selectedPin = pins.find((pin) => pin.id === selectedPinId) ?? null;
   const distance = pathDistanceMeters(pins);
 
   useEffect(() => {
@@ -78,17 +217,21 @@ export default function ManualRecordPage() {
     setMessage('');
   }
 
-  function handleRatePin(isInteresting) {
-    if (!selectedPinId) return;
+  function handleRatePin(pinId, isInteresting) {
     setPins((prev) =>
-      prev.map((pin) => (pin.id === selectedPinId ? { ...pin, isInteresting } : pin))
+      prev.map((pin) => (pin.id === pinId ? { ...pin, isInteresting } : pin))
     );
   }
 
-  function handleRemoveSelected() {
-    if (!selectedPinId) return;
-    setPins((prev) => prev.filter((pin) => pin.id !== selectedPinId));
-    setSelectedPinId(null);
+  function handleMovePin(pinId, latitude, longitude) {
+    setPins((prev) =>
+      prev.map((pin) => (pin.id === pinId ? { ...pin, latitude, longitude } : pin))
+    );
+  }
+
+  function handleRemovePin(pinId) {
+    setPins((prev) => prev.filter((pin) => pin.id !== pinId));
+    if (selectedPinId === pinId) setSelectedPinId(null);
   }
 
   async function handleAuthSubmit(e) {
@@ -117,10 +260,12 @@ export default function ManualRecordPage() {
   async function handleUpload() {
     if (pins.length < 2) {
       setMessage('Drop at least two pins to create a trail.');
+      setPanelOpen(true);
       return;
     }
     if (!getToken()) {
       setMessage('Sign in below to upload your trail.');
+      setPanelOpen(true);
       return;
     }
 
@@ -139,12 +284,44 @@ export default function ManualRecordPage() {
       );
       setPins([]);
       setSelectedPinId(null);
+      setPanelOpen(true);
     } catch (err) {
       setMessage(err.response?.data?.message || err.message);
+      setPanelOpen(true);
     } finally {
       setUploading(false);
     }
   }
+
+  const controlProps = {
+    title,
+    onTitleChange: setTitle,
+    pins,
+    distance,
+    locationError,
+    message,
+    uploading,
+    loggedIn,
+    authMode,
+    name,
+    identifier,
+    password,
+    authError,
+    authLoading,
+    onUndoLast: handleUndoLast,
+    onClear: handleClear,
+    onUpload: handleUpload,
+    onAuthModeChange: (mode) => {
+      setAuthMode(mode);
+      setAuthError('');
+    },
+    onNameChange: setName,
+    onIdentifierChange: setIdentifier,
+    onPasswordChange: setPassword,
+    onAuthSubmit: handleAuthSubmit,
+    onExplore: () => navigate('/explore'),
+    showAuth: !loggedIn && pins.length >= 2,
+  };
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -176,188 +353,57 @@ export default function ManualRecordPage() {
         )}
       </header>
 
-      <div className="relative min-h-0 flex-1">
-        <ManualPinMap
-          pins={pins}
-          selectedPinId={selectedPinId}
-          onAddPin={handleAddPin}
-          onSelectPin={setSelectedPinId}
-          userLocation={userLocation}
-          onUserLocation={setUserLocation}
-          onLocationError={setLocationError}
-        />
-
-        <Card className="absolute bottom-4 left-4 right-4 z-[1001] mx-auto max-w-lg shadow-sheet sm:left-6 sm:right-6">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Trail name (e.g. Ridge path)"
-            className="mb-3 w-full border-0 bg-transparent text-lg font-semibold text-foreground outline-none placeholder:text-muted"
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="relative min-h-0 flex-1">
+          <ManualPinMap
+            pins={pins}
+            selectedPinId={selectedPinId}
+            onAddPin={handleAddPin}
+            onSelectPin={setSelectedPinId}
+            onMovePin={handleMovePin}
+            onRatePin={handleRatePin}
+            onRemovePin={handleRemovePin}
+            onDismissPin={() => setSelectedPinId(null)}
+            userLocation={userLocation}
+            onUserLocation={setUserLocation}
+            onLocationError={setLocationError}
+            mapPaddingBottom={panelOpen ? 280 : 72}
           />
 
-          <div className="mb-3 flex flex-wrap gap-2 text-sm">
-            <span className="rounded-pill bg-background px-3 py-1 font-semibold text-foreground">
-              {pins.length} pin{pins.length === 1 ? '' : 's'}
-            </span>
-            <span className="rounded-pill bg-background px-3 py-1 font-semibold text-foreground">
-              {formatDistance(distance)}
-            </span>
-          </div>
+          {/* Mobile: compact bottom bar + collapsible panel */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1001] md:hidden">
+            <div className="pointer-events-auto border-t border-border bg-surface/95 shadow-sheet backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => setPanelOpen((open) => !open)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="min-w-0 text-left">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {title || 'Manual trail'}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {pins.length} pin{pins.length === 1 ? '' : 's'} · {formatDistance(distance)}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-primary">
+                  {panelOpen ? 'Hide ▾' : 'Trail ▴'}
+                </span>
+              </button>
 
-          {locationError && (
-            <p className="mb-2 text-xs text-destructive">Location: {locationError}</p>
-          )}
-
-          <p className="mb-3 text-sm text-muted">
-            Tap the map to drop pins along a trail. No GPS needed — useful for planning or
-            sketching routes from memory.
-          </p>
-
-          {selectedPin && (
-            <div className="mb-3 rounded-lg border border-border bg-background p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-foreground">
-                  Pin {pins.findIndex((pin) => pin.id === selectedPin.id) + 1}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleRemoveSelected}
-                  className="text-xs font-semibold text-destructive"
-                >
-                  Remove
-                </button>
-              </div>
-              <p className="mt-1 font-mono text-xs text-muted">
-                {selectedPin.latitude.toFixed(5)}, {selectedPin.longitude.toFixed(5)}
-              </p>
-              <p className="mt-3 text-sm font-semibold text-foreground">Rate this pin</p>
-              <div className="mt-2">
-                <BinaryRatingButtons
-                  positiveLabel="Interesting"
-                  negativeLabel="Not interesting"
-                  onPositive={() => handleRatePin(true)}
-                  onNegative={() => handleRatePin(false)}
-                />
-              </div>
-              {selectedPin.isInteresting !== null && (
-                <p className="mt-2 text-xs text-muted">
-                  Marked as {selectedPin.isInteresting ? 'interesting' : 'not interesting'}
-                </p>
+              {panelOpen && (
+                <div className="max-h-[40vh] overflow-y-auto border-t border-border px-4 pb-4 pt-3">
+                  <TrailControls {...controlProps} />
+                </div>
               )}
             </div>
-          )}
-
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="outline"
-              className="flex-1"
-              disabled={pins.length === 0 || uploading}
-              onClick={handleUndoLast}
-            >
-              Undo last
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              disabled={pins.length === 0 || uploading}
-              onClick={handleClear}
-            >
-              Clear all
-            </Button>
-            <Button
-              className="flex-1"
-              disabled={pins.length < 2 || uploading}
-              onClick={handleUpload}
-            >
-              {uploading ? 'Uploading…' : 'Upload trail'}
-            </Button>
           </div>
+        </div>
 
-          {message && <p className="mt-3 text-sm text-muted">{message}</p>}
-
-          {message.startsWith('Uploaded') && (
-            <button
-              type="button"
-              onClick={() => navigate('/explore')}
-              className="mt-3 min-h-[44px] text-sm font-semibold text-primary"
-            >
-              Explore community trails →
-            </button>
-          )}
-
-          {!loggedIn && pins.length >= 2 && (
-            <div className="mt-4 border-t border-border pt-4">
-              <div className="mb-3 flex rounded-lg bg-background p-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('login');
-                    setAuthError('');
-                  }}
-                  className={`flex-1 min-h-[44px] rounded-md py-1.5 text-xs font-semibold transition-colors ${
-                    authMode === 'login' ? 'bg-surface text-primary shadow-sm' : 'text-muted'
-                  }`}
-                >
-                  Sign in
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('register');
-                    setAuthError('');
-                  }}
-                  className={`flex-1 min-h-[44px] rounded-md py-1.5 text-xs font-semibold transition-colors ${
-                    authMode === 'register' ? 'bg-surface text-primary shadow-sm' : 'text-muted'
-                  }`}
-                >
-                  Register
-                </button>
-              </div>
-              <form onSubmit={handleAuthSubmit} className="space-y-2">
-                {authMode === 'register' && (
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  />
-                )}
-                <input
-                  type="text"
-                  placeholder="Email or phone number"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  autoComplete="username"
-                  required
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                />
-                {authError && <p className="text-xs text-destructive">{authError}</p>}
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full min-h-[44px] rounded-pill bg-primary py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                >
-                  {authLoading
-                    ? 'Please wait…'
-                    : authMode === 'register'
-                      ? 'Create account'
-                      : 'Sign in'}
-                </button>
-              </form>
-            </div>
-          )}
-        </Card>
+        {/* Desktop: fixed sidebar — never covers the map */}
+        <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-border bg-surface p-4 md:block">
+          <TrailControls {...controlProps} />
+        </aside>
       </div>
     </div>
   );

@@ -18,9 +18,11 @@ export const CAMBODIA_LEAFLET_BOUNDS = [
   [CAMBODIA_BOUNDS.north, CAMBODIA_BOUNDS.east],
 ];
 
-/** Default zoom levels — lower min zoom = fewer tiles at country scale. */
+/** Default zoom levels — max ~20 lets a ~50 m radius fill a typical screen. */
 export const CAMBODIA_MIN_ZOOM = 7;
-export const CAMBODIA_MAX_ZOOM = 16;
+/** Native OSM tile detail stops here; map can zoom one level further via upscaling. */
+export const CAMBODIA_TILE_MAX_ZOOM = 19;
+export const CAMBODIA_MAX_ZOOM = 20;
 
 export const CAMBODIA_DEFAULT_REGION = {
   latitude: CAMBODIA_CENTER.latitude,
